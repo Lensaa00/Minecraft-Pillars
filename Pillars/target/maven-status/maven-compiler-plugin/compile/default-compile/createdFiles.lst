@@ -1,3 +1,6 @@
+org\qniman\pillars\listeners\BlockPlace.class
 org\qniman\pillars\Pillars.class
 org\qniman\pillars\Pillars$PillarsCommand.class
-org\qniman\pillars\Pillars$EventListener.class
+org\qniman\pillars\listeners\PlayerDeath.class
+org\qniman\pillars\managers\PlayerManager.class
+org\qniman\pillars\managers\GameManager.class
