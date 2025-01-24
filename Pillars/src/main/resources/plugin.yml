@@ -6,5 +6,5 @@ commands:
   pillars:
     description: Команда для взаимодействия с мини-игрой Столбы.
     usage: /pillars < join | leave | start >
-    permission: yourplugin.yourcommandpermission
+    permission: pillars.pillars
 

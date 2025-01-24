@@ -7,11 +7,13 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
+import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.boss.*;
 
 import java.util.*;
 
@@ -29,7 +31,7 @@ public final class Pillars extends JavaPlugin {
     int minPlayers = 2;
 
     // Переменные для платформы лобби
-    Location lobbyLocation = new Location(Bukkit.getWorld("world"), 0, 0, 0);
+    Location lobbyLocation;
     Material lobbyMaterial = Material.BEDROCK;
     int lobbyRadius = 20;
     List<Location> lobbyBlocks = new ArrayList<>();
@@ -45,22 +47,31 @@ public final class Pillars extends JavaPlugin {
     int shedulerTaskId = -1;
     int giveItemTimer = 0;
     int giveItemDelay = 10;
+    List<Location> spawnedBlocks = new ArrayList<>();
+    BossBar bossBar;
 
+    // Включение плагина
     @Override
     public void onEnable() {
         getServer().getPluginManager().registerEvents(new EventListener(), this);
         this.getCommand("pillars").setExecutor(new PillarsCommand());
         playWorld = Bukkit.getWorld("world");
+        lobbyLocation = new Location(playWorld, 0, 0, 0);
         createLobbyPlatform();
+
+        bossBar = Bukkit.createBossBar("Следующий предмет", BarColor.PINK, BarStyle.SEGMENTED_10);
+        bossBar.setVisible(false);
     }
 
+    // Выключение плагина
     @Override
     public void onDisable() {
     }
 
+    // Создание платформы-лобби
     void createLobbyPlatform() {
-        int startX = lobbyLocation.getBlockX();
-        int startZ = lobbyLocation.getBlockZ();
+        int startX = lobbyLocation.getBlockX() - lobbyRadius / 2;
+        int startZ = lobbyLocation.getBlockZ() - lobbyRadius / 2;
 
         for (int col = 0; col < lobbyRadius; col++) {
             startX = lobbyRadius - col;
@@ -81,6 +92,7 @@ public final class Pillars extends JavaPlugin {
             if (!readyPlayers.contains(player)) {
                 readyPlayers.add(player);
                 Bukkit.broadcastMessage(chatPrefix + player.getName() + " присоединился к игре!");
+                bossBar.addPlayer(player);
 
                 if (readyPlayers.size() < minPlayers) {
                     int remainingPlayers = minPlayers - readyPlayers.size();
@@ -108,18 +120,20 @@ public final class Pillars extends JavaPlugin {
         }
     }
 
+    // Функция создания столба
     void createPillar(Location location) {
         int locationX = location.getBlockX();
         int locationY = location.getBlockY();
         int locationZ = location.getBlockZ();
 
         for (int i = 1; i <= pillarHeight; i++) {
-            Location spawnLocation = new Location(playWorld, locationX, locationY, locationZ - i);
+            Location spawnLocation = new Location(playWorld, locationX, locationY - i, locationZ);
             spawnLocation.getBlock().setType(pillarMaterial);
             pillarBlocks.add(spawnLocation);
         }
     }
 
+    // Функция создания столбов для игроков
     void createPillars() {
         int playerCount = playingPlayers.size();
         double angleIncrement = 2 * Math.PI / playerCount; // Угол между игроками
@@ -140,12 +154,13 @@ public final class Pillars extends JavaPlugin {
             // Перемещаем игрока на вершину столба
             Player player = playingPlayers.get(i);
             player.setGameMode(GameMode.SURVIVAL);
-            player.setHealth(100);
+            player.setHealth(20);
             player.getInventory().clear();
             player.teleport(pillarLocation.clone().add(0, pillarHeight, 0)); // Вверх на высоту столба
         }
     }
 
+    // Удаление столбов
     void removePillars() {
         for (Location location : pillarBlocks) {
             location.getBlock().setType(Material.AIR);
@@ -153,6 +168,15 @@ public final class Pillars extends JavaPlugin {
         pillarBlocks.clear();
     }
 
+    // Очистка блоков игроков
+    void clearPlayerBlocks() {
+        for (Location location : spawnedBlocks) {
+            location.getBlock().setType(Material.AIR);
+        }
+        spawnedBlocks.clear();
+    }
+
+    // Выдача предметов
     public void giveItem(Player player) {
         Material[] materials = Material.values();
         Random random = new Random();
@@ -165,6 +189,7 @@ public final class Pillars extends JavaPlugin {
         player.getInventory().addItem(randomItem);
     }
 
+    // Основной цикл игры
     void gameLoop() {
         if (isGameRunning) {
             if (giveItemTimer < giveItemDelay) {
@@ -176,7 +201,11 @@ public final class Pillars extends JavaPlugin {
                 giveItemTimer = 0;
             }
 
-            if (playingPlayers.size() == 1) {
+            bossBar.setVisible(true);
+            bossBar.setProgress((double) giveItemTimer / 10);
+
+
+            if (playingPlayers.size() <= 1) {
                 Player winner = playingPlayers.get(0);
                 Bukkit.broadcastMessage(chatPrefix + winner.getName() + ChatColor.GREEN + " выиграл в игре!");
                 endGame();
@@ -184,24 +213,7 @@ public final class Pillars extends JavaPlugin {
         }
     }
 
-    void endGame() {
-        if (isGameRunning) {
-            isGameRunning = false;
-            removePillars();
-            Bukkit.getScheduler().cancelTask(shedulerTaskId);
-
-            for (Player player : playingPlayers) {
-                player.teleport(lobbyLocation);
-                player.setGameMode(GameMode.SURVIVAL);
-                player.setHealth(100);
-                player.getInventory().clear();
-            }
-
-            playingPlayers.clear();
-            giveItemTimer = 0;
-        }
-    }
-
+    // Функция начала игры
     void startGame(Player player) {
         if (isGameRunning) {
             player.sendMessage(chatPrefix + "Игра уже запущена.");
@@ -212,6 +224,8 @@ public final class Pillars extends JavaPlugin {
                 playingPlayers = new ArrayList<>(readyPlayers);
                 readyPlayers.clear();
 
+                bossBar.setVisible(true);
+
                 createPillars();
                 Bukkit.broadcastMessage(chatPrefix + ChatColor.GREEN + "Игра началась!");
                 shedulerTaskId = Bukkit.getScheduler().scheduleSyncRepeatingTask(this, this::gameLoop, 0, 20L);
@@ -219,6 +233,28 @@ public final class Pillars extends JavaPlugin {
             } else {
                 player.sendMessage(chatPrefix + "Недостаточно игроков. Минимум игроков для начала: " + minPlayers);
             }
+        }
+    }
+
+    // Функция окончания игры
+    void endGame() {
+        if (isGameRunning) {
+            removePillars();
+            clearPlayerBlocks();
+            Bukkit.getScheduler().cancelTask(shedulerTaskId);
+
+            for (Player player : playingPlayers) {
+                player.teleport(lobbyLocation);
+                player.setGameMode(GameMode.SURVIVAL);
+                player.setHealth(20);
+                player.getInventory().clear();
+                bossBar.removePlayer(player);
+            }
+
+            playingPlayers.clear();
+            giveItemTimer = 0;
+            bossBar.setVisible(false);
+            isGameRunning = false;
         }
     }
 
@@ -255,15 +291,10 @@ public final class Pillars extends JavaPlugin {
     // Слушатель эвентов игры
     public class EventListener implements Listener {
         @EventHandler
-        public void onPlayerJoin(PlayerJoinEvent event) {
-            if (!players.contains(event.getPlayer())) {
-                players.add(event.getPlayer());
+        public void onPlayerSpawnBlock(BlockPlaceEvent event) {
+            if (isGameRunning) {
+                spawnedBlocks.add(event.getBlock().getLocation());
             }
-        }
-
-        @EventHandler
-        public void onPlayerQuit(PlayerQuitEvent event) {
-            players.remove(event.getPlayer());
         }
 
         @EventHandler
@@ -271,7 +302,10 @@ public final class Pillars extends JavaPlugin {
             if (isGameRunning) {
                 Player player = event.getPlayer();
                 player.getInventory().clear();
-                player.setGameMode(GameMode.SPECTATOR);
+                playingPlayers.remove(player);
+                if (playingPlayers.size() - 1 > 1) {
+                    player.setGameMode(GameMode.SPECTATOR);
+                }
             }
         }
     }
