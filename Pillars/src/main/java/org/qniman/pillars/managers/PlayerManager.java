@@ -1,10 +1,11 @@
 package org.qniman.pillars.managers;
 
+import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 
-import java.util.Random;
+import java.util.*;
 
 public class PlayerManager {
     GameManager gameManager;
@@ -24,5 +25,12 @@ public class PlayerManager {
         ItemStack randomItem = new ItemStack(randomMaterial);
 
         player.getInventory().addItem(randomItem);
+    }
+
+    public void broadcastTitle(String title, String subtitle){
+        List<Player> players = new ArrayList<>(Bukkit.getOnlinePlayers());
+        for (Player player : players) {
+            player.sendTitle(title, subtitle, 10, 10, 10);
+        }
     }
 }

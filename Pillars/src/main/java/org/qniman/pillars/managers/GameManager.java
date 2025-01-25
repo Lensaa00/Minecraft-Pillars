@@ -26,6 +26,7 @@ public class GameManager {
     Location pillarsCenterLocation = new Location(Bukkit.getWorld("world"), 2500, 0, 2500); // Позиция лобби
     Material lobbyMaterial = Material.BEDROCK; // Материал лобби
     int giveItemDelay = 10; // Задержка между выдачей предметов
+    int gameStartDelay = 3;
     String chatPrefix = ChatColor.YELLOW + "[Столбы] " + ChatColor.WHITE;
 
     // Переменные режима
@@ -34,9 +35,10 @@ public class GameManager {
     public List<Player> playingPlayers = new ArrayList<>();
     public List<Location> spawnedBlocks = new ArrayList<>();
 
-    World playWorld = null;
+    World playWorld;
     int shedulerTaskId = -1;
     int giveItemTimer = 0;
+    int gameStartTimer = 0;
     BossBar bossBar;
     List<Location> pillarBlocks = new ArrayList<>();
     Location lobbyLocation;
@@ -45,9 +47,12 @@ public class GameManager {
     public GameManager(JavaPlugin plugin) {
         this.plugin = plugin;
         this.playerManager = new PlayerManager(this);
-        this.bossBar = Bukkit.createBossBar("Следующий блок", BarColor.YELLOW, BarStyle.SEGMENTED_20);
+        this.bossBar = Bukkit.createBossBar("Следующий блок", BarColor.YELLOW, BarStyle.SEGMENTED_10);
         bossBar.setProgress(0);
         bossBar.setVisible(false);
+        playWorld = Bukkit.getWorld("world");
+        lobbyLocation = new Location(playWorld, 0, 0, 0);
+        createLobbyPlatform();
     }
 
     // ФУНКЦИЯ НАЧАЛА ИГРЫ
@@ -58,20 +63,42 @@ public class GameManager {
             if (readyPlayers.size() >= minPlayers) {
                 isGameRunning = true;
 
-                playingPlayers = new ArrayList<>(readyPlayers);
-                readyPlayers.clear();
+                // Начинаем отсчет
+                Bukkit.getScheduler().runTask(plugin, () -> startCountdown(gameStartDelay, () -> {
+                    // Когда отсчет завершен, начинаем игру
+                    playerManager.broadcastTitle(ChatColor.GREEN + "Начали", "");
+                    playingPlayers = new ArrayList<>(readyPlayers);
+                    readyPlayers.clear();
 
-                bossBar.setVisible(true);
+                    bossBar.setVisible(true);
 
-                createPillars();
-                Bukkit.broadcastMessage(chatPrefix + ChatColor.GREEN + "Игра началась!");
-                shedulerTaskId = Bukkit.getScheduler().scheduleSyncRepeatingTask(plugin, this::gameLoop, 0, 20L);
-
+                    createPillars();
+                    Bukkit.broadcastMessage(chatPrefix + ChatColor.GREEN + "Игра началась!");
+                    shedulerTaskId = Bukkit.getScheduler().scheduleSyncRepeatingTask(plugin, this::gameLoop, 0, 20L);
+                }));
             } else {
                 player.sendMessage(chatPrefix + "Недостаточно игроков. Минимум игроков для начала: " + minPlayers);
             }
         }
     }
+
+    // ФУНКЦИЯ ОТСЧЕТА
+    private void startCountdown(int seconds, Runnable onFinish) {
+        for (int i = 0; i < seconds; i++) {
+            int timeRemaining = seconds - i;
+            Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                // Выводим отсчет в заголовок
+                playerManager.broadcastTitle(ChatColor.YELLOW + Integer.toString(timeRemaining), "");
+                if (timeRemaining == 1) {
+                    Bukkit.broadcastMessage(chatPrefix + ChatColor.GREEN + "Игра начинается!");
+                }
+            }, i * 20L); // Задержка в тиках (1 секунда = 20 тиков)
+        }
+
+        // Вызов завершения отсчета
+        Bukkit.getScheduler().runTaskLater(plugin, onFinish, seconds * 20L);
+    }
+
 
     // ФУНКЦИЯ ВХОДА ИГРОКА В ИГРУ
     public void joinGame(Player player) {
@@ -102,6 +129,7 @@ public class GameManager {
         } else {
             if (readyPlayers.contains(player)) {
                 readyPlayers.remove(player);
+                bossBar.removePlayer(player);
                 Bukkit.broadcastMessage(chatPrefix + player.getName() + " больше не учавствует в игре");
             } else {
                 player.sendMessage(chatPrefix + "Вы не находитесь в игре, чтобы ее покинуть");
@@ -144,7 +172,7 @@ public class GameManager {
             }
 
             bossBar.setVisible(true);
-            bossBar.setProgress(20D - 20D / giveItemTimer);
+            bossBar.setProgress((double) giveItemTimer / 10);
 
 
             if (playingPlayers.size() <= 1) {
@@ -191,7 +219,7 @@ public class GameManager {
             player.setGameMode(GameMode.SURVIVAL);
             player.setHealth(20);
             player.getInventory().clear();
-            player.teleport(pillarLocation.clone().add(0, pillarHeight, 0)); // Вверх на высоту столба
+            player.teleport(pillarLocation); // Вверх на высоту столба
         }
     }
 

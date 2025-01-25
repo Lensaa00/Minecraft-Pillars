@@ -18,12 +18,12 @@ public class Commands implements CommandExecutor {
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if (!(sender instanceof Player)) {
             sender.sendMessage(ChatColor.RED + "Сейчас вы не можете использовать эту команду.");
-            return false;
+            return true;
         }
 
         if (args.length == 0) {
             sender.sendMessage(ChatColor.RED + "Ошибка!" + ChatColor.WHITE + " Использование: " + command.getUsage());
-            return false;
+            return true;
         }
 
         switch (args[0]) {
@@ -35,6 +35,9 @@ public class Commands implements CommandExecutor {
                 break;
             case "start":
                 gameManager.startGame((Player) sender);
+                break;
+            default:
+                sender.sendMessage(ChatColor.RED + "Ошибка!" + ChatColor.WHITE + " Использование: " + command.getUsage());
                 break;
         }
 
