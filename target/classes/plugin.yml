@@ -1,9 +1,0 @@
-name: Pillars
-version: '1.0'
-main: org.qniman.pillars.Pillars
-api-version: '1.20'
-commands:
-  pillars:
-    description: Команда для взаимодействия с мини-игрой Столбы.
-    usage: /pillars < join | leave | start >
-    permission: pillars.pillars
